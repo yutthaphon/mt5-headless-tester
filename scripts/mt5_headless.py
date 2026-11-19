@@ -619,6 +619,70 @@ def resolve_report_htm_path(report_arg: str, paths: Dict[str, str]) -> Tuple[str
     raise FileNotFoundError(f"Report .htm not found: {report_arg} (checked {candidate})")
 
 
+def resolve_expert_ini_path(expert_arg: str, paths: Dict[str, str]) -> str:
+    """Normalize Expert= path to Windows backslashes and verify the .ex5 exists under MQL5\\Experts."""
+    raw = (expert_arg or "").strip().strip('"').strip("'")
+    if not raw:
+        raise ValueError("--expert cannot be empty")
+    norm = raw.replace("/", "\\")
+    if not norm.lower().endswith(".ex5"):
+        norm += ".ex5"
+
+    experts_dir = os.path.abspath(paths["experts_dir"])
+    if os.path.isabs(norm):
+        abs_ex5 = os.path.abspath(norm)
+        if not os.path.isfile(abs_ex5):
+            raise FileNotFoundError(f"Expert .ex5 not found: {abs_ex5}")
+        try:
+            common = os.path.commonpath([os.path.normcase(experts_dir), os.path.normcase(abs_ex5)])
+        except ValueError:
+            common = ""
+        if common != os.path.normcase(experts_dir):
+            raise ValueError(
+                f"MT5 Strategy Tester requires the .ex5 inside '{experts_dir}', got: {abs_ex5}"
+            )
+        rel = os.path.relpath(abs_ex5, experts_dir)
+    else:
+        rel = norm.lstrip("\\")
+        if rel.startswith(".."):
+            raise ValueError(
+                f"Expert path must stay inside '{experts_dir}', got: {expert_arg}"
+            )
+        if not os.path.isfile(os.path.join(experts_dir, rel)):
+            m_prefix = re.match(r"^(?:mql5\\)?experts\\(.+)$", rel, re.I)
+            if m_prefix and os.path.isfile(os.path.join(experts_dir, m_prefix.group(1))):
+                rel = m_prefix.group(1)
+
+    full_ex5 = os.path.normpath(os.path.join(experts_dir, rel))
+    if not os.path.isfile(full_ex5):
+        suggestions: List[str] = []
+        if os.path.isdir(experts_dir):
+            rel_low = rel.lower()
+            base_low = os.path.basename(rel).lower()
+            for root, _, files in os.walk(experts_dir):
+                for fname in files:
+                    if not fname.lower().endswith(".ex5"):
+                        continue
+                    cand_rel = os.path.relpath(os.path.join(root, fname), experts_dir).replace("/", "\\")
+                    cand_low = cand_rel.lower()
+                    if cand_low.endswith("\\" + rel_low) or fname.lower() == base_low:
+                        suggestions.append(cand_rel)
+        hint = (
+            f' Did you mean: --expert "{suggestions[0]}"?'
+            if len(suggestions) == 1
+            else (
+                " Matching .ex5 files: " + ", ".join(f'"{s}"' for s in suggestions[:5])
+                if suggestions
+                else ""
+            )
+        )
+        raise FileNotFoundError(
+            f"Expert .ex5 not found under MQL5\\Experts: {full_ex5} (from Expert={rel}).{hint}"
+        )
+
+    return rel.replace("/", "\\")
+
+
 # ---------------------------------------------------------------------------
 # MQL5 Source Parsing (Inputs & Enums)
 # ---------------------------------------------------------------------------
@@ -1126,19 +1190,101 @@ def parse_opt_overrides(opt_args: Sequence[str]) -> Dict[str, Tuple[str, str, st
     return opts
 
 
+def _ensure_default_tail(
+    entry: Dict[str, Any],
+    key: Optional[str] = None,
+    source_meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Synthesize a valid MT5 optimization tail (||start||step||stop||N) when absent."""
+    if entry.get("has_tail"):
+        return entry
+
+    inp = source_meta["inputs_by_name"].get(key) if (source_meta and key) else None
+    opt_flag = entry.get("optimize") or "N"
+    val_str = str(entry.get("value", "")).strip()
+
+    if inp and inp.get("is_enum"):
+        ev = inp.get("enum_values") or {}
+        min_ord = min(ev.values()) if ev else 0
+        max_ord = max(ev.values()) if ev else 0
+        entry.update(
+            {
+                "start": str(min_ord),
+                "step": "0",
+                "stop": str(max_ord),
+                "optimize": opt_flag,
+                "has_tail": True,
+            }
+        )
+        return entry
+
+    dtype = inp["type"] if inp else _infer_input_type(val_str)
+
+    if dtype == "bool" or val_str.lower() in ("true", "false"):
+        entry.update(
+            {
+                "start": "false",
+                "step": "0",
+                "stop": "true",
+                "optimize": opt_flag,
+                "has_tail": True,
+            }
+        )
+    elif dtype in ("int", "long", "uint", "ulong", "short", "ushort", "char", "uchar", "int/enum") or re.match(
+        r"^[+-]?\d+$", val_str
+    ):
+        try:
+            n = int(val_str, 0)
+            stop_n = n * 10 if n != 0 else 10
+            entry.update(
+                {
+                    "start": str(n),
+                    "step": "1",
+                    "stop": str(stop_n),
+                    "optimize": opt_flag,
+                    "has_tail": True,
+                }
+            )
+        except ValueError:
+            entry["has_tail"] = False
+    elif dtype in ("double", "float") or re.match(r"^[+-]?\d+\.\d+$", val_str):
+        try:
+            f = float(val_str)
+            step_f = abs(f) / 10.0 if f != 0.0 else 0.1
+            stop_f = f * 10.0 if f != 0.0 else 1.0
+            entry.update(
+                {
+                    "start": val_str,
+                    "step": f"{step_f:.6f}",
+                    "stop": f"{stop_f:.6f}",
+                    "optimize": opt_flag,
+                    "has_tail": True,
+                }
+            )
+        except ValueError:
+            entry["has_tail"] = False
+    else:
+        entry["has_tail"] = False
+
+    return entry
+
+
 def resolve_override_value(
     key: str,
     raw_val: str,
     source_meta: Optional[Dict[str, Any]],
+    existing_val: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
-    """Resolve boolean normalization and symbolic enum names to ordinals."""
+    """Resolve boolean normalization and symbolic enum names to ordinals, validating types."""
     notes: Optional[str] = None
     val = raw_val
+    expected_type = ""
 
     if source_meta:
         inp = source_meta["inputs_by_name"].get(key)
         if inp:
             dtype = inp["type"]
+            expected_type = "enum" if inp.get("is_enum") else dtype
             if dtype == "bool" and val.lower() in ("true", "false", "1", "0"):
                 val = "true" if val.lower() in ("true", "1") else "false"
                 return val, None
@@ -1170,6 +1316,60 @@ def resolve_override_value(
             if val in einfo["values"]:
                 ord_val = str(einfo["values"][val])
                 return ord_val, f"{val} ({ename}) -> {ord_val}"
+
+    if not expected_type and existing_val is not None and existing_val != "":
+        expected_type = _infer_input_type(existing_val)
+
+    if not source_meta and expected_type in ("int/enum", ""):
+        for ename, emap in BUILTIN_ENUMS.items():
+            if val in emap:
+                ord_val = str(emap[val])
+                return ord_val, f"{val} ({ename}) -> {ord_val}"
+            ci_b = {k.lower(): (k, v) for k, v in emap.items()}
+            if val.lower() in ci_b:
+                canon, num = ci_b[val.lower()]
+                return str(num), f"{canon} ({ename}) -> {num}"
+
+    if expected_type == "bool":
+        if val.lower() in ("true", "false", "1", "0"):
+            val = "true" if val.lower() in ("true", "1") else "false"
+            return val, notes
+        raise ValueError(
+            f"Invalid boolean value '{raw_val}' for input '{key}' (expected true/false or 1/0)."
+        )
+
+    if expected_type in (
+        "int/enum",
+        "enum",
+        "int",
+        "long",
+        "uint",
+        "ulong",
+        "short",
+        "ushort",
+        "char",
+        "uchar",
+        "color",
+    ):
+        try:
+            int(val, 0)
+        except ValueError:
+            if not source_meta:
+                raise ValueError(
+                    f"Cannot set numeric/enum input '{key}' (base value '{existing_val}') to symbolic name '{raw_val}' without --source <EA.mq5>. "
+                    f"Pass --source <path/to/EA.mq5> to resolve enum names to integer ordinals, or pass the numeric ordinal directly."
+                )
+            raise ValueError(
+                f"Invalid integer/enum value '{raw_val}' for input '{key}' (type {expected_type})."
+            )
+
+    if expected_type in ("double", "float"):
+        try:
+            float(val)
+        except ValueError:
+            raise ValueError(
+                f"Invalid numeric value '{raw_val}' for floating-point input '{key}' (base value '{existing_val}')."
+            )
 
     if val.lower() in ("true", "false"):
         val = val.lower()
@@ -2050,12 +2250,14 @@ def _build_base_inputs(
                 val = str(inp["default_ordinal"])
             else:
                 val = inp["default"]
-            inputs[inp["name"]] = parse_input_entry(val)
+            inputs[inp["name"]] = _ensure_default_tail(
+                parse_input_entry(val), inp["name"], source_meta
+            )
 
     if from_report:
         rep_data = parse_htm_report(from_report, paths)
         for k, v in rep_data.get("inputs", {}).items():
-            inputs[k] = parse_input_entry(v)
+            inputs[k] = _ensure_default_tail(parse_input_entry(v), k, source_meta)
 
     if from_profile:
         prof = parse_ini_or_set(resolve_profile_path(from_profile, paths))
@@ -2091,10 +2293,13 @@ def _apply_input_overrides(
             else:
                 inputs[key] = parse_input_entry("")
 
-        resolved_val, enum_note = resolve_override_value(key, raw_val, source_meta)
         entry = inputs[key]
+        resolved_val, enum_note = resolve_override_value(
+            key, raw_val, source_meta, existing_val=entry.get("value")
+        )
         old_val = entry["value"]
         entry["value"] = resolved_val
+        _ensure_default_tail(entry, key, source_meta)
         note = f"{key}: {old_val} -> {resolved_val}"
         if enum_note:
             note += f" ({enum_note})"
@@ -2115,8 +2320,20 @@ def _apply_input_overrides(
             entry["optimize"] = "N"
             change_notes.append(f"{key}: optimization disabled")
         else:
-            r_start, _ = resolve_override_value(key, start, source_meta)
-            r_stop, _ = resolve_override_value(key, stop, source_meta)
+            r_start, _ = resolve_override_value(
+                key, start, source_meta, existing_val=entry.get("value")
+            )
+            r_stop, _ = resolve_override_value(
+                key, stop, source_meta, existing_val=entry.get("value")
+            )
+            for bound_name, bound_val in (("start", r_start), ("stop", r_stop)):
+                if bound_val.lower() not in ("true", "false"):
+                    try:
+                        float(bound_val)
+                    except ValueError:
+                        raise ValueError(
+                            f"Optimization {bound_name} value '{bound_val}' for '{key}' could not be resolved to a number or boolean."
+                        )
             if not entry["value"]:
                 entry["value"] = r_start
             entry["start"] = r_start
@@ -2761,14 +2978,48 @@ def _run_terminal_minimized(
         scrub_ini_credentials(abs_ini)
 
 
+def _verify_loaded_expert(expected_expert_rel: str, rep: Dict[str, Any]) -> None:
+    """Verify MT5 actually executed the intended .ex5 and did not silently fall back to another EA."""
+    expected_norm = expected_expert_rel.replace("/", "\\").lstrip("\\").lower()
+    expected_stem = pathlib.Path(expected_norm).stem.lower()
+    loaded_expert = ((rep.get("diagnostics") or {}).get("loaded_expert") or "").strip()
+    if loaded_expert:
+        loaded_rel = re.sub(
+            r"^(?:mql5\\)?experts\\",
+            "",
+            loaded_expert.replace("/", "\\").lstrip("\\"),
+            flags=re.I,
+        )
+        loaded_stem = pathlib.Path(loaded_rel).stem.lower()
+        mismatch = (
+            loaded_rel.lower() != expected_norm
+            if ("\\" in loaded_rel and "\\" in expected_norm)
+            else (loaded_stem != expected_stem)
+        )
+        if mismatch:
+            raise RuntimeError(
+                f"MT5 ran the wrong Expert Advisor! Expected '{expected_expert_rel}', "
+                f"but agent log loaded '{loaded_expert}'."
+            )
+    rep_expert = ((rep.get("settings") or {}).get("Expert") or "").strip()
+    if rep_expert:
+        rep_stem = pathlib.Path(rep_expert.replace("/", "\\")).stem.lower()
+        if rep_stem != expected_stem:
+            raise RuntimeError(
+                f"MT5 ran the wrong Expert Advisor! Expected '{expected_expert_rel}' "
+                f"(stem '{expected_stem}'), but report shows Expert='{rep_expert}'."
+            )
+
+
 def cmd_probe(args: argparse.Namespace) -> int:
     paths = resolve_env_paths(args)
+    expert_rel = resolve_expert_ini_path(args.expert, paths)
     if args.report:
         report_name = args.report
         if re.search(r"[\\/:.]", report_name):
             raise ValueError(f"--report must be a bare name without paths or extension: {report_name}")
     else:
-        stem = pathlib.Path(args.expert).stem
+        stem = pathlib.Path(expert_rel).stem
         sanitized = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_") or "ea"
         report_name = f"probe_{sanitized[:40]}"
 
@@ -2778,7 +3029,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
         f"; Generated by mt5-headless-tester probe on {dt.datetime.now().strftime('%Y.%m.%d %H:%M:%S')}",
         *common_lines,
         "[Tester]",
-        f"Expert={args.expert}",
+        f"Expert={expert_rel}",
         f"Symbol={args.symbol}",
         f"Period={args.period}",
         f"Model={args.model}",
@@ -2806,7 +3057,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
     print(f"Probe INI: {abs_ini}")
     print(f"Mode     : {'PORTABLE (/portable)' if paths['portable'] else 'STANDARD'}")
     print(f"Launch   : {paths['launch_mode']} (--run uses built-in {paths['launch_mode']} launcher; or use external Ghost MCP if installed)")
-    print(f"Expert   : {args.expert} | {args.symbol} {args.period} | Model={args.model} ({args.from_date} - {args.to_date})")
+    print(f"Expert   : {expert_rel} | {args.symbol} {args.period} | Model={args.model} ({args.from_date} - {args.to_date})")
     if auth_status["any"]:
         print(
             "Auth     : "
@@ -2827,11 +3078,12 @@ def cmd_probe(args: argparse.Namespace) -> int:
         elif args.save_to_tester:
             print(f"  set --from-report {report_name} --save-to-tester \"{args.save_to_tester}\"")
         else:
-            print(f"  set --from-report {report_name} --save-to-tester \"{pathlib.Path(args.expert).stem}_defaults\"")
+            print(f"  set --from-report {report_name} --save-to-tester \"{pathlib.Path(expert_rel).stem}_defaults\"")
         return 0
 
     _run_terminal_minimized(paths, abs_ini, report_name)
     rep = parse_htm_report(report_name, paths)
+    _verify_loaded_expert(expert_rel, rep)
     inputs_meta = rep.get("inputs_meta", [])
     groups = list(dict.fromkeys(x["group"] for x in inputs_meta if x.get("group")))
     print(f"\nProbe Discovered : {len(inputs_meta)} compiled input(s) across {len(groups)} group(s) from {rep['source_htm']}")
@@ -2846,12 +3098,13 @@ def cmd_probe(args: argparse.Namespace) -> int:
     if out_set:
         now_str = dt.datetime.now().strftime("%Y.%m.%d %H:%M:%S")
         set_lines = [
-            f"; probed from {args.expert} via {report_name}.htm on {now_str}",
+            f"; probed from {expert_rel} via {report_name}.htm on {now_str}",
             "; encoding: UTF-16LE with BOM",
             ";",
         ]
         for k, v in rep.get("inputs", {}).items():
-            set_lines.append(f"{k}={v}")
+            entry = _ensure_default_tail(parse_input_entry(v), k, None)
+            set_lines.append(f"{k}={format_input_entry(entry)}")
         write_utf16le_bom(out_set, set_lines)
         print(f"Wrote .set       : {os.path.abspath(out_set)} ({len(rep.get('inputs', {}))} inputs)")
 
@@ -2935,6 +3188,7 @@ def cmd_test(args: argparse.Namespace) -> int:
 
     if "Expert" not in tester or "Symbol" not in tester or "Period" not in tester:
         raise ValueError("[Tester] requires Expert, Symbol, and Period (pass --profile or CLI flags)")
+    tester["Expert"] = resolve_expert_ini_path(tester["Expert"], paths)
 
     common_lines, auth_status = _build_common_auth_lines(
         require_all=getattr(args, "use_env_auth", False)
@@ -2984,6 +3238,7 @@ def cmd_test(args: argparse.Namespace) -> int:
         return 0
 
     _run_terminal_minimized(paths, abs_ini, report_name)
+    _verify_loaded_expert(tester["Expert"], parse_htm_report(report_name, paths))
 
     deals_out = args.deals or os.path.join(paths["work_dir"], f"deals_{report_name}.txt")
     rep_args = argparse.Namespace(
@@ -3291,6 +3546,7 @@ def _export_pass_to_set(
         ";",
     ]
     for k, entry in merged.items():
+        _ensure_default_tail(entry, k, None)
         lines.append(f"{k}={format_input_entry(entry)}")
 
     write_utf16le_bom(out_set_path, lines)
@@ -3305,7 +3561,7 @@ def export_opt_text(
     lines = [
         f"=== Optimization Report: {opt_data['report_name']} ===",
         f"Source XML   : {opt_data['source_xml']}",
-        f"Total Passes : {opt_data['total_passes']} (Profitable: {opt_data['profitable_passes']}, Matching Filters: {len(ranked)})",
+        f"Total Passes : {opt_data['total_passes']} (Profitable: {opt_data['profitable_passes']}, Matched: {len(ranked)}/{opt_data['total_passes']}, Shown: {len(shown)})",
         f"Ranked By    : {sort_by}",
         "",
     ]
@@ -3340,7 +3596,7 @@ def export_opt_md(
         f"# Parallel Optimization Report: `{opt_data['report_name']}`",
         "",
         f"- **Source XML**: `{opt_data['source_xml']}`",
-        f"- **Total Passes**: `{opt_data['total_passes']}` | **Profitable**: `{opt_data['profitable_passes']}` | **Filtered**: `{len(ranked)}`",
+        f"- **Total Passes**: `{opt_data['total_passes']}` | **Profitable**: `{opt_data['profitable_passes']}` | **Matched**: `{len(ranked)} / {opt_data['total_passes']}` | **Shown**: `{len(shown)}`",
         f"- **Ranked By**: `{sort_by}`",
         "",
     ]
@@ -3399,6 +3655,8 @@ def export_opt_json(
         "sort_by": sort_by,
         "total_passes": opt_data["total_passes"],
         "profitable_passes": opt_data["profitable_passes"],
+        "matched_passes": len(ranked),
+        "shown_passes": len(ranked[:top_n]),
         "filtered_passes": len(ranked),
         "varied_inputs": opt_data["varied_inputs"],
         "best_pass": ranked[0] if ranked else None,
@@ -3717,7 +3975,7 @@ def export_opt_html(
       <div class="subtitle">
         <span>Source: <code>{esc(opt_data['source_xml'])}</code></span>
         <span class="pill accent">Ranked by: {esc(sort_by)}</span>
-        <span class="pill">Filtered: {len(ranked)} / {total_p} passes</span>
+        <span class="pill">Matched: {len(ranked)} / {total_p} passes (Shown: {len(shown)})</span>
       </div>
     </div>
     <div class="header-right">
@@ -3884,6 +4142,7 @@ def cmd_optimize(args: argparse.Namespace) -> int:
 
     if "Expert" not in tester or "Symbol" not in tester or "Period" not in tester:
         raise ValueError("[Tester] requires Expert, Symbol, and Period")
+    tester["Expert"] = resolve_expert_ini_path(tester["Expert"], paths)
 
     common_lines, auth_status = _build_common_auth_lines(
         require_all=getattr(args, "use_env_auth", False)
@@ -3930,7 +4189,7 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         if auth_status["password"]:
             print(f"Security : After terminal exits, run 'scrub-ini \"{abs_ini}\"'")
         print(f"\nAfter terminal exits, export leaderboard & best .set via:")
-        print(f"  report {report_name}.xml --sort-by {args.sort_by} --top {args.top} --save-best-to-tester \"{report_name}_best\"")
+        print(f"  report {report_name}.xml --profile \"{abs_ini}\" --sort-by {args.sort_by} --top {args.top} --save-best-to-tester \"{report_name}_best\"")
         return 0
 
     _run_terminal_minimized(paths, abs_ini, report_name)
@@ -4051,6 +4310,7 @@ def _scan_mt5_logs(paths: Dict[str, str], htm_path: str) -> Dict[str, Any]:
 
     test_passed_duration = None
     final_balance_line = None
+    loaded_expert = None
     errors: List[str] = []
 
     err_re = re.compile(r"\b(error|init_failed|cannot|not found|failed)\b", re.I)
@@ -4063,6 +4323,13 @@ def _scan_mt5_logs(paths: Dict[str, str], htm_path: str) -> Dict[str, Any]:
         fb = re.findall(r"final balance [^\r\n]+", content)
         if fb:
             final_balance_line = fb[-1].strip()
+        loaded_experts = re.findall(
+            r"expert file added:\s*([^\r\n]+?)(?:\.\s+\d+\s+bytes loaded|$)",
+            content,
+            re.I,
+        )
+        if loaded_experts:
+            loaded_expert = loaded_experts[-1].strip()
         for ln in content.splitlines()[-400:]:
             if err_re.search(ln):
                 errors.append(f"[agent] {ln.strip()}")
@@ -4078,6 +4345,7 @@ def _scan_mt5_logs(paths: Dict[str, str], htm_path: str) -> Dict[str, Any]:
         "terminal_log": newest_term_log,
         "test_passed_in": test_passed_duration,
         "final_balance_line": final_balance_line,
+        "loaded_expert": loaded_expert,
         "error_lines": errors[-25:],
     }
 
@@ -5113,21 +5381,12 @@ def cmd_report(args: argparse.Namespace) -> int:
             out_set = os.path.join(paths["profiles_tester_dir"], name)
 
         if out_set and (ranked or opt_data["passes"]):
-            base_inputs = None
-            if (
+            has_base = bool(
                 getattr(args, "profile", None)
                 or getattr(args, "set_file", None)
                 or getattr(args, "from_source", None)
                 or getattr(args, "from_report", None)
-            ):
-                base_inputs, _, _ = _build_base_inputs(
-                    paths,
-                    getattr(args, "profile", None),
-                    getattr(args, "set_file", None),
-                    getattr(args, "from_source", None),
-                    getattr(args, "source", None),
-                    getattr(args, "from_report", None),
-                )
+            )
             pool = ranked or opt_data["passes"]
             pick_pass = getattr(args, "pick_pass", None)
             picked = (
@@ -5137,6 +5396,32 @@ def cmd_report(args: argparse.Namespace) -> int:
             )
             if not picked:
                 raise ValueError(f"Pass #{pick_pass} not found in optimization XML.")
+
+            if not has_base and not getattr(args, "allow_partial_set", False):
+                candidate_ini = os.path.join(paths["work_dir"], f"{opt_data['report_name']}.ini")
+                hint = (
+                    f' (e.g. --profile "{candidate_ini}")'
+                    if os.path.isfile(candidate_ini)
+                    else " (e.g. --profile <Profile.ini> --set-file <Base.set>)"
+                )
+                raise ValueError(
+                    f"Refusing to write partial .set with only {len(picked.get('inputs', {}))} optimized input(s) "
+                    f"({', '.join(picked.get('inputs', {}).keys())}) from {opt_data['report_name']}.xml — "
+                    f"omitted inputs would silently reset to EA defaults in Strategy Tester. "
+                    f"Pass --profile, --set-file, --from-report, or --from-source to merge the winning pass into a complete baseline{hint}, "
+                    f"or pass --allow-partial-set to export only the optimized columns."
+                )
+
+            base_inputs = None
+            if has_base:
+                base_inputs, _, _ = _build_base_inputs(
+                    paths,
+                    getattr(args, "profile", None),
+                    getattr(args, "set_file", None),
+                    getattr(args, "from_source", None),
+                    getattr(args, "source", None),
+                    getattr(args, "from_report", None),
+                )
             cnt = _export_pass_to_set(picked, out_set, base_inputs, opt_data["report_name"])
             print(f"Best .set: {os.path.abspath(out_set)} (pass #{picked.get('pass','?')}, {cnt} inputs, UTF-16LE BOM)")
 
@@ -6029,8 +6314,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # set
     p_set = sub.add_parser("set", parents=[common], help="Build, update, validate, or diff UTF-16LE .set files")
-    p_set.add_argument("--from-profile", help="Base tester .ini profile name or path")
-    p_set.add_argument("--from-set", help="Base .set file name or path")
+    p_set.add_argument("--from-profile", "--profile", dest="from_profile", help="Base tester .ini profile name or path")
+    p_set.add_argument("--from-set", "--set-file", dest="from_set", help="Base .set file name or path")
     p_set.add_argument("--from-report", help="Base inputs extracted from a Strategy Tester .htm report (for compiled .ex5 without source)")
     p_set.add_argument("--from-source", help="Build base inputs directly from .mq5/.mqh defaults")
     p_set.add_argument("--source", help="Reference .mq5/.mqh source for enum name -> ordinal resolution")
@@ -6057,7 +6342,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_tst = sub.add_parser("test", parents=[common], help="Generate tester .ini (and optionally run headless Strategy Tester)")
     p_tst.add_argument("--report", required=True, help="Bare report name without path or extension (MT5 writes <Report>.htm)")
     p_tst.add_argument("--profile", help="Base tester .ini profile name or path")
-    p_tst.add_argument("--set-file", help="Overlay .set file name or path")
+    p_tst.add_argument("--set-file", "--from-set", dest="set_file", help="Overlay .set file name or path")
     p_tst.add_argument("--from-report", help="Base inputs extracted from a Strategy Tester .htm report")
     p_tst.add_argument("--from-source", help="Build base inputs from .mq5/.mqh defaults if no profile/set is used")
     p_tst.add_argument("--source", help="Reference .mq5/.mqh source for enum name -> ordinal resolution")
@@ -6101,7 +6386,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt = sub.add_parser("optimize", parents=[common], help="Parallel multi-core Optimization (local metatester64 agents) + XML ranking & best .set export")
     p_opt.add_argument("--report", required=True, help="Bare report name (MT5 writes <Report>.xml)")
     p_opt.add_argument("--profile", help="Base tester .ini profile name or path")
-    p_opt.add_argument("--set-file", help="Overlay .set file name or path")
+    p_opt.add_argument("--set-file", "--from-set", dest="set_file", help="Overlay .set file name or path")
     p_opt.add_argument("--from-report", help="Base inputs extracted from a Strategy Tester .htm report")
     p_opt.add_argument("--from-source", help="Build base inputs from .mq5/.mqh defaults")
     p_opt.add_argument("--source", help="Reference .mq5/.mqh source for enum name -> ordinal resolution")
@@ -6157,11 +6442,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_rep.add_argument("--pick-pass", type=int, help="Pick a specific Pass # when exporting .set from .xml")
     p_rep.add_argument("--export-best-set", help="Export winning XML pass as UTF-16LE .set file")
     p_rep.add_argument("--save-best-to-tester", help="Save winning XML pass to MQL5\\Profiles\\Tester\\<name>.set")
-    p_rep.add_argument("--profile", help="Optional baseline .ini profile when exporting .set from .xml")
-    p_rep.add_argument("--set-file", help="Optional baseline .set file when exporting .set from .xml")
-    p_rep.add_argument("--from-report", help="Optional baseline .htm report when exporting .set from .xml")
-    p_rep.add_argument("--from-source", help="Optional baseline .mq5 source when exporting .set from .xml")
+    p_rep.add_argument("--profile", help="Baseline .ini profile when exporting .set from .xml")
+    p_rep.add_argument("--set-file", "--from-set", dest="set_file", help="Baseline .set file when exporting .set from .xml")
+    p_rep.add_argument("--from-report", help="Baseline .htm report when exporting .set from .xml")
+    p_rep.add_argument("--from-source", help="Baseline .mq5 source when exporting .set from .xml")
     p_rep.add_argument("--source", help="Optional .mq5 source reference")
+    p_rep.add_argument("--allow-partial-set", action="store_true", help="Allow exporting a partial .set containing only optimized columns from .xml without a baseline")
     p_rep.set_defaults(func=cmd_report)
 
     # compare

@@ -60,7 +60,7 @@ For isolated `/portable` instances (or explicit broker authentication), MT5 read
 
 | Key | Value / Format | Notes |
 |---|---|---|
-| `Expert` | `MyEA\MyEA.ex5` | Relative path under `MQL5\Experts`. Avoid spaces in `.ex5` filename. |
+| `Expert` | `MyEA\MyEA.ex5` | Relative path under `MQL5\Experts` using Windows backslashes `\`. Avoid spaces in `.ex5` filename. `mt5_headless.py` automatically normalizes `/` to `\` and verifies the `.ex5` exists before writing `.ini`. |
 | `ExpertParameters` | `MyPreset.set` | Optional `.set` file under `MQL5\Profiles\Tester\`. When `[TesterInputs]` is included directly in the `.ini`, those values control the test. |
 | `Symbol` | `XAUUSD` | Broker symbol name (exact match, including suffixes). |
 | `Period` | `M1`, `M5`, `M15`, `M30`, `H1`, `H4`, `D1`, `W1`, `MN1` | Chart timeframe. |
@@ -88,6 +88,6 @@ Each parameter line in a `.set` file or `[TesterInputs]` section follows:
 InpKey=value||start||step||stop||Y_or_N
 ```
 
-- **Enum Ordinals**: MT5 stores enum inputs as 0-based integer ordinals inside `.set` and `.ini` files (e.g. `InpTradeMode=2` for `MODE_TREND_FOLLOW`). Pass `--source <file.mq5>` to `inspect`, `set`, or `test` to automatically resolve symbolic names.
-- **Complete Baseline**: Always build `.set` and `.ini` files from a real profile (`--profile`), complete `.set` (`--from-set`), probe report (`--from-report`), or full source defaults (`--from-source`) so omitted inputs do not fall back to unintended EA defaults.
-- **Compiled `.ex5` Without Source**: Run `probe --expert <name.ex5> --symbol <sym>` (`Model=2`, no `[TesterInputs]`). MT5 writes every compiled `input` and `input group` into `<Report>.htm`, which `inspect --report` and `set --from-report` convert directly into UTF-16LE `.set` files.
+- **Enum Ordinals**: MT5 stores enum inputs as 0-based integer ordinals inside `.set` and `.ini` files (e.g. `InpTradeMode=2` for `MODE_TREND_FOLLOW`). Pass `--source <file.mq5>` to `inspect`, `set`, or `test` to automatically resolve symbolic names; passing an unresolved symbolic enum name without `--source` fails fast to prevent writing broken `.set` files.
+- **Complete Baseline**: Always build `.set` and `.ini` files (including `report <opt.xml> --save-best-to-tester` / `--export-best-set`) from a real profile (`--profile`), complete `.set` (`--from-set`), probe report (`--from-report`), or full source defaults (`--from-source`) so omitted inputs do not fall back to unintended EA defaults.
+- **Compiled `.ex5` Without Source**: Run `probe --expert <name.ex5> --symbol <sym>` (`Model=2`, no `[TesterInputs]`). MT5 writes every compiled `input` and `input group` into `<Report>.htm`, which `inspect --report` and `set --from-report` convert directly into UTF-16LE `.set` files with valid `||start||step||stop||N` tails.

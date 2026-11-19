@@ -249,7 +249,7 @@ Because `.ex5` binaries are encrypted, run a fast 1–2 day `probe` in `Model=2`
 ```bash
 # 1) Run a fast probe to capture all default inputs & groups into MQL5\Profiles\Tester\
 scripts/mt5-headless.sh probe \
-  --expert "Market/MyPurchasedEA.ex5" \
+  --expert "Market\MyPurchasedEA.ex5" \
   --symbol "XAUUSD" \
   --period "H1" \
   --from-date "2026.09.01" \
@@ -261,7 +261,7 @@ scripts/mt5-headless.sh probe \
 # 2) Inspect extracted inputs from the probe report
 scripts/mt5-headless.sh inspect --report probe_MyPurchasedEA --format md
 
-# 3) Override desired parameters and save a clean tuned .set
+# 3) Override desired parameters and save a clean tuned .set (synthesizes ||start||step||stop||N tails; pass --source if using enum names)
 scripts/mt5-headless.sh set --from-report probe_MyPurchasedEA --set InpLots=0.05 --save-to-tester "MyPurchasedEA_tuned"
 ```
 
@@ -285,9 +285,10 @@ scripts\mt5-headless.cmd test ^
 
 ```bash
 # Mode B: External Ghost MCP — generate .ini only (omit --run) and receive the GhostMCP JSON payload
+# (Note: mt5_headless.py normalizes '/' to '\' in Expert= and validates the .ex5 exists under MQL5\Experts\)
 scripts/mt5-headless.sh test \
   --from-set "MyEA_Trend_v1.set" \
-  --expert "work/MyEA_test.ex5" \
+  --expert "work\MyEA_test.ex5" \
   --symbol "XAUUSD" --period "M15" \
   --from-date "2026.04.01" --to-date "2026.05.01" \
   --report sample_run1 \
@@ -311,7 +312,7 @@ scripts/mt5-headless.sh report sample_run1 --format html --out "reports/sample_r
 scripts/mt5-headless.sh optimize \
   --profile "MyEA.XAUUSD.M15.ini" \
   --source "src/MyEA.mq5" \
-  --expert "work/MyEA_test.ex5" \
+  --expert "work\MyEA_test.ex5" \
   --report sample_opt1 \
   --model 1 \
   --mode 1 \
@@ -339,7 +340,7 @@ scripts\mt5-headless.cmd report sample_run1 --format md --out "reports\sample_ru
 scripts\mt5-headless.cmd report sample_run1 --format json --out "reports\sample_run1.json"
 scripts\mt5-headless.cmd report sample_run1 --format html --out "reports\sample_run1.html" --embed-images
 
-:: Export Parallel Optimization leaderboard (.xml) and save specific pass #33 as a reusable .set
+:: Export Parallel Optimization leaderboard (.xml) and save specific pass #33 as a complete .set (requires baseline --profile / --set-file / --from-report / --from-source)
 scripts\mt5-headless.cmd report sample_opt1.xml --sort-by profit_factor --top 15 --format html --out "reports\opt_leaderboard.html"
 scripts\mt5-headless.cmd report sample_opt1.xml --profile "MyEA.XAUUSD.M15.ini" --pick-pass 33 --save-best-to-tester "MyEA_pass33"
 ```

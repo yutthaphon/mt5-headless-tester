@@ -122,7 +122,7 @@ scripts/mt5-headless.sh inspect --source "path/to/EA.mq5" --enums-only
 scripts/mt5-headless.sh inspect --source "path/to/EA.mq5" --profile "MyEA.XAUUSD.M15.ini" --search "TradeMode|MAPeriod" --format md
 ```
 
-Generate or update a UTF-16LE (with BOM) `.set` preset ready for Strategy Tester or live loading. Passing `--source` lets the AI specify **symbolic enum names** (e.g., `InpTradeMode=MODE_TREND_FOLLOW`), which are converted to MT5's integer ordinals (e.g., `2`), while preserving existing `||start||step||stop||Y/N` tails and catching typos:
+Generate or update a UTF-16LE (with BOM) `.set` preset ready for Strategy Tester or live loading. Passing `--source` lets the AI specify **symbolic enum names** (e.g., `InpTradeMode=MODE_TREND_FOLLOW`), which are converted to MT5's integer ordinals (e.g., `2`), while preserving existing `||start||step||stop||Y/N` tails (or synthesizing valid `||start||step||stop||N` tails for `--from-report` / `--from-source`) and rejecting unresolved enum names or type mismatches when `--source` is omitted:
 
 ```bash
 scripts/mt5-headless.sh set \
@@ -158,19 +158,21 @@ Compiled `.ex5` binaries are encrypted/packed, so `input` declarations cannot be
 > **MQL5 Market EA Rules (`MQL5\Experts\Market\*.ex5`)**:
 > - **Activation / DRM**: Market `.ex5` files are encrypted to your machine + MQL5 Community account in the MT5 installation where they were downloaded. Bind to that activated installation (`bind --select 1`), **not** an unactivated `.mt5-portable` copy (unless you log into your MQL5 Community account and re-download the Market product inside that portable instance).
 > - **Keep original path/name**: Reference `--expert "Market\ProductName.ex5"` as installed; do not rename or move Market `.ex5` files.
-> - **Enum values**: Without `.mq5` source, `probe` / `.htm` shows numeric ordinals (`0, 1, 2...`) for enum inputs; verify which ordinal corresponds to each mode from the EA's GUI Inputs tab or vendor documentation before overriding.
+> - **Enum values**: Without `.mq5` source, `probe` / `.htm` shows numeric ordinals (`0, 1, 2...`) for enum inputs; verify which ordinal corresponds to each mode from the EA's GUI Inputs tab or vendor documentation before overriding. Passing a symbolic enum name to `set --from-report` without `--source` fails fast to prevent writing an unresolved identifier into `.set`.
 
 ### Workflow 3: `compile` — Headless Compile Gate
 
 Compile `.mq5` sources with `MetaEditor64.exe` (automatically stages space-free copies when filenames contain spaces, carries `#property icon` targets, verifies the UTF-16LE `.log`, and optionally deploys the `.ex5`):
 
 ```bash
-scripts/mt5-headless.sh compile --source "src/MyEA.mq5" --deploy-to "MyEA/MyEA_test.ex5"
+scripts/mt5-headless.sh compile --source "src/MyEA.mq5" --deploy-to "MyEA\MyEA_test.ex5"
 ```
 
 Pass gate: `Built: True` **and** `Result: 0 errors`.
 
 ### Workflow 4: `test` — Prepare & Run Headless Backtest
+
+`mt5_headless.py` normalizes `/` to `\` in `Expert=`, verifies the `.ex5` exists under `<DataDir>\MQL5\Experts\` before generating the `.ini`, and confirms the agent log loaded the expected `.ex5` after `--run` completes.
 
 #### Option A: Built-in Non-Ghost Launchers (`--run` — No External MCP Required)
 
@@ -195,7 +197,7 @@ Generate `<Report>.ini` without launching MT5 (`--run` omitted). If `.env` or `M
 scripts/mt5-headless.sh test \
   --profile "MyEA.XAUUSD.M15.ini" \
   --set-file "MyEA_Trend_v1.set" \
-  --expert "MyEA/MyEA.ex5" \
+  --expert "MyEA\MyEA.ex5" \
   --report sample_run1 \
   --model 0
 ```
@@ -215,7 +217,7 @@ Run MT5's native parallel **Optimization** (`Optimization=1` Complete or `Optimi
 scripts/mt5-headless.sh optimize \
   --profile "MyEA.XAUUSD.M15.ini" \
   --source "src/MyEA.mq5" \
-  --expert "MyEA/MyEA.ex5" \
+  --expert "MyEA\MyEA.ex5" \
   --report sample_opt1 \
   --model 1 \
   --mode 1 \
@@ -235,7 +237,7 @@ scripts/mt5-headless.sh optimize \
 
 ### Workflow 5: `report` — Export Backtests (`.htm`) or Optimization Leaderboards (`.xml`)
 
-Parse any MT5 Strategy Tester `.htm` report or `.xml` optimization report, and export to `.md`, `.json`, or standalone `.html`:
+Parse any MT5 Strategy Tester `.htm` report or `.xml` optimization report, and export to `.md`, `.json`, or standalone `.html`. Exporting a pass to `.set` (`--save-best-to-tester` / `--export-best-set`) requires a complete baseline (`--profile`, `--set-file`, `--from-report`, or `--from-source`) so non-swept inputs do not fall back to EA defaults:
 
 ```bash
 # Backtest (.htm)
@@ -243,7 +245,7 @@ scripts/mt5-headless.sh report sample_run1 --format md --out "reports/sample_run
 scripts/mt5-headless.sh report sample_run1 --format json --out "reports/sample_run1.json"
 scripts/mt5-headless.sh report sample_run1 --format html --out "reports/sample_run1.html" --embed-images
 
-# Optimization (.xml) leaderboard + pick Pass #33 to .set
+# Optimization (.xml) leaderboard + pick Pass #33 to .set (requires baseline)
 scripts/mt5-headless.sh report sample_opt1.xml --sort-by profit_factor --top 15 --format html --out "reports/opt_leaderboard.html"
 scripts/mt5-headless.sh report sample_opt1.xml --profile "MyProfile.ini" --pick-pass 33 --save-best-to-tester "MyEA_pass33"
 ```

@@ -248,7 +248,7 @@ scripts\mt5-headless.cmd compile --source "src\My EA.mq5" --deploy-to "work\MyEA
 ```bash
 # 1) รัน Probe สั้นๆ เพื่อสกัด Input & Group ทั้งหมดและบันทึกเป็นไฟล์ .set ตั้งต้น
 scripts/mt5-headless.sh probe \
-  --expert "Market/MyPurchasedEA.ex5" \
+  --expert "Market\MyPurchasedEA.ex5" \
   --symbol "XAUUSD" \
   --period "H1" \
   --from-date "2026.09.01" \
@@ -260,7 +260,7 @@ scripts/mt5-headless.sh probe \
 # 2) ดู Input ที่สกัดได้จากรายงาน Probe
 scripts/mt5-headless.sh inspect --report probe_MyPurchasedEA --format md
 
-# 3) ปรับแก้ Input แล้วบันทึกเป็น .set ใหม่พร้อมใช้
+# 3) ปรับแก้ Input แล้วบันทึกเป็น .set ใหม่พร้อมใช้ (สร้าง tail ||start||step||stop||N ให้อัตโนมัติ; ต้องใส่ --source หากตั้งค่า Enum ด้วยชื่อ)
 scripts/mt5-headless.sh set --from-report probe_MyPurchasedEA --set InpLots=0.05 --save-to-tester "MyPurchasedEA_tuned"
 ```
 
@@ -284,9 +284,10 @@ scripts\mt5-headless.cmd test ^
 
 ```bash
 # แบบ B: กรณีใช้ Ghost MCP ภายนอก — สร้างเฉพาะ .ini (ไม่ใส่ --run) แล้วส่ง GhostMCP JSON ให้ MCP
+# (หมายเหตุ: mt5_headless.py จะแปลง '/' เป็น '\' ใน Expert= และตรวจว่ามีไฟล์ .ex5 จริงใต้ MQL5\Experts\)
 scripts/mt5-headless.sh test \
   --from-set "MyEA_Trend_v1.set" \
-  --expert "work/MyEA_test.ex5" \
+  --expert "work\MyEA_test.ex5" \
   --symbol "XAUUSD" --period "M15" \
   --from-date "2026.04.01" --to-date "2026.05.01" \
   --report sample_run1 \
@@ -310,7 +311,7 @@ scripts/mt5-headless.sh report sample_run1 --format html --out "reports/sample_r
 scripts/mt5-headless.sh optimize \
   --profile "MyEA.XAUUSD.M15.ini" \
   --source "src/MyEA.mq5" \
-  --expert "work/MyEA_test.ex5" \
+  --expert "work\MyEA_test.ex5" \
   --report sample_opt1 \
   --model 1 \
   --mode 1 \
@@ -338,7 +339,7 @@ scripts\mt5-headless.cmd report sample_run1 --format md --out "reports\sample_ru
 scripts\mt5-headless.cmd report sample_run1 --format json --out "reports\sample_run1.json"
 scripts\mt5-headless.cmd report sample_run1 --format html --out "reports\sample_run1.html" --embed-images
 
-:: ส่งออก Leaderboard จากผล Optimization (.xml) และเลือกสกัดเฉพาะ Pass #33 เป็นไฟล์ .set
+:: ส่งออก Leaderboard จากผล Optimization (.xml) และเลือกสกัดเฉพาะ Pass #33 เป็นไฟล์ .set ครบทุก input (ต้องระบุ baseline --profile / --set-file / --from-report / --from-source)
 scripts\mt5-headless.cmd report sample_opt1.xml --sort-by profit_factor --top 15 --format html --out "reports\opt_leaderboard.html"
 scripts\mt5-headless.cmd report sample_opt1.xml --profile "MyEA.XAUUSD.M15.ini" --pick-pass 33 --save-best-to-tester "MyEA_pass33"
 ```

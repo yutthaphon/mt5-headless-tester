@@ -62,8 +62,9 @@ Measured behaviors, safety constraints, and common error resolutions from produc
 
 | Symptom | Root Cause | Solution |
 |---|---|---|
-| No `.htm` report generated | Invalid `Expert=` path, spaces in `.ex5`, or `Report=` had path/extension | Ensure `Expert=` is relative to `MQL5\Experts\`, has no spaces, and `--report` is a bare name. Inspect `<DataDir>\logs\YYYYMMDD.log`. |
-| `0` trades or very few trades | Partial `.ini` inputs fell back to defaults, or EA hit an expiry guard | Start from a real profile (`--profile`) or full `.set`; check Tester Agent log for `INIT_FAILED`. |
+| No `.htm` report generated | Invalid `Expert=` path, spaces in `.ex5`, or `Report=` had path/extension | Ensure `Expert=` is relative to `MQL5\Experts\` using `\`, has no spaces, and `--report` is a bare name. Inspect `<DataDir>\logs\YYYYMMDD.log`. |
+| MT5 silently runs wrong EA (e.g., `Moving Average.ex5`) | `Expert=` used `/` forward slashes or pointed to a missing `.ex5` (MT5 logs no error and falls back to last-selected EA) | `mt5_headless.py` automatically normalizes `/` -> `\`, verifies the `.ex5` exists before creating `.ini`, and checks the agent log (`expert file added:`) after `--run`. |
+| `0` trades or very few trades | Partial `.ini`/`.set` inputs fell back to defaults, unresolved enum name written as text, or EA hit an expiry guard | Start from a real profile (`--profile`) or full `.set`; pass `--source <EA.mq5>` when overriding enum names; pass a baseline when exporting `.xml` passes (`report ... --profile`); check Tester Agent log for `INIT_FAILED`. |
 | `Input '...' not present in base profile/set` | Typo in `Inp*` name or old profile missing new inputs | Run `inspect --source <ea.mq5> --search <term>` or pass `--allow-new`. |
 | News Filter has no effect in backtest | `CalendarValueHistory()` fails in Strategy Tester (`-1`, error `4014`) | Expected MT5 behavior; disable news filter during deterministic tests. |
 | Test ends early with fewer `Bars` | Account hit **stop-out** (`so` in Deal comment) | Check `report` output for `STOP OUT` warning and drawdown metrics. |
