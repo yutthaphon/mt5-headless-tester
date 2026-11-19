@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MT5 Comparison — sample_run1 vs sample_run2</title>
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('mt5_report_theme');
+    if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --card-alt: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --muted: #64748b; --accent: #0284c7; --accent-soft: rgba(2,132,199,0.10);
+    --good: #059669; --good-bg: rgba(16,185,129,0.12);
+    --bad: #dc2626; --bad-bg: rgba(239,68,68,0.12);
+    --warn: #d97706; --warn-bg: rgba(245,158,11,0.13);
+    --code-bg: #f1f5f9; --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  }
+  html[data-theme="dark"] {
+    --bg: #0b1120; --card: #111827; --card-alt: #1e293b; --border: #1f2937;
+    --text: #f8fafc; --muted: #94a3b8; --accent: #38bdf8; --accent-soft: rgba(56,189,248,0.14);
+    --good: #34d399; --good-bg: rgba(52,211,153,0.15);
+    --bad: #f87171; --bad-bg: rgba(248,113,113,0.15);
+    --warn: #fbbf24; --warn-bg: rgba(251,191,36,0.15);
+    --code-bg: #1e293b; --shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 24px 20px 48px; }
+  .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .title { font-size: 1.42rem; font-weight: 750; margin: 0; letter-spacing: -0.015em; }
+  .subtitle { color: var(--muted); font-size: 0.88rem; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .badge { display: inline-flex; align-items: center; padding: 5px 13px; border-radius: 999px; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em; color: #fff; }
+  .pill { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: var(--card-alt); border: 1px solid var(--border); color: var(--text); }
+  .pill.good { background: var(--good-bg); color: var(--good); border-color: transparent; }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .btn { cursor: pointer; border: 1px solid var(--border); background: var(--card-alt); color: var(--text); border-radius: 9px; padding: 6px 12px; font-size: 0.82rem; font-weight: 600; transition: all 0.15s ease; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { opacity: 0.92; color: #fff; }
+  .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi-label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  .kpi-val { font-size: 1.24rem; font-weight: 750; margin-top: 5px; font-variant-numeric: tabular-nums; }
+  .kpi-sub { font-size: 0.78rem; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .kpi-val.good, .good { color: var(--good); }
+  .kpi-val.bad, .bad { color: var(--bad); }
+  .kpi-val.warn, .warn { color: var(--warn); }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel h2 { margin: 0; font-size: 1.06rem; font-weight: 700; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+  .charts-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .chart-card { background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .chart-card img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
+  .chart-title { font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--card-alt); position: sticky; top: 0; font-weight: 650; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; z-index: 1; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll-box { max-height: 460px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .search-input { width: 100%; max-width: 340px; padding: 7px 12px; border: 1px solid var(--border); background: var(--card-alt); color: var(--text); border-radius: 8px; font-size: 0.86rem; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.84rem; }
+  .log-box { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; overflow-x: auto; font-size: 0.8rem; border: 1px solid var(--border); margin: 10px 0 0; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: 0.83em; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .winbar-wrap { margin-top: 8px; height: 8px; border-radius: 999px; background: var(--bad-bg); overflow: hidden; display: flex; }
+  .winbar-fill { background: var(--good); height: 100%; }
+  .group-row td { background: var(--card-alt); font-weight: 700; color: var(--accent); font-size: 0.78rem; letter-spacing: 0.03em; }
+  .svg-wrap { width: 100%; overflow: hidden; }
+  .svg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; font-size: 0.84rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .diff-cell { background: var(--warn-bg); font-weight: 700; }
+  @media (max-width: 640px) { .grid2, .charts-grid, .charts-grid-3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1 class="title">Run Comparison: sample_run1 vs sample_run2</h1>
+      <div class="subtitle">
+        <span>Base: <b>61</b> deals</span>
+        <span>Target: <b>65</b> deals</span>
+        <span class="pill">Timestamp column ignored</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="badge" style="background:#dc2626">DIFFER</span>
+      <button id="themeBtn" class="btn" onclick="toggleTheme()">Dark Mode</button>
+    </div>
+  </div>
+
+  
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">Base Run</div><div class="kpi-val">sample_run1</div><div class="kpi-sub">XAUUSD M15 (2026.04.01 - 2026.05.01) &bull; 61 deals</div></div>
+    <div class="kpi"><div class="kpi-label">Target Run</div><div class="kpi-val">sample_run2</div><div class="kpi-sub">XAUUSD M15 (2026.04.01 - 2026.05.01) &bull; 65 deals</div></div>
+    <div class="kpi"><div class="kpi-label">Deals Parity</div><div class="kpi-val bad">DIFFER</div><div class="kpi-sub">First diff at row #3</div></div>
+    <div class="kpi"><div class="kpi-label">Changed Inputs</div><div class="kpi-val">2</div><div class="kpi-sub">Parameters differing</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Overlay Balance Curve (Base vs Target)</h2></div>
+    <div class="svg-legend"><span><span class="legend-dot" style="background:#0284c7"></span><b>Base: sample_run1</b>: 10,000.00 &rarr; <b>10,194.30</b> <span class="good">(+194.30)</span></span><span><span class="legend-dot" style="background:#10b981"></span><b>Target: sample_run2</b>: 10,000.00 &rarr; <b>10,283.80</b> <span class="good">(+283.80)</span></span></div><div class="svg-wrap"><svg viewBox="0 0 960 230" width="100%" height="auto" preserveAspectRatio="xMidYMid meet"><line x1="76" y1="16.0" x2="942" y2="16.0" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/><text x="68" y="20.0" text-anchor="end" fill="var(--muted)" font-size="11">10,284</text><line x1="76" y1="63.0" x2="942" y2="63.0" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/><text x="68" y="67.0" text-anchor="end" fill="var(--muted)" font-size="11">10,213</text><line x1="76" y1="110.0" x2="942" y2="110.0" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/><text x="68" y="114.0" text-anchor="end" fill="var(--muted)" font-size="11">10,142</text><line x1="76" y1="157.0" x2="942" y2="157.0" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/><text x="68" y="161.0" text-anchor="end" fill="var(--muted)" font-size="11">10,071</text><line x1="76" y1="204.0" x2="942" y2="204.0" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/><text x="68" y="208.0" text-anchor="end" fill="var(--muted)" font-size="11">10,000</text><defs><linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0284c7" stop-opacity="0.22"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0.01"/></linearGradient></defs><polygon points="76.0,204.0 76.0,204.0 90.4,204.0 104.9,195.8 119.3,195.8 133.7,201.2 148.2,201.2 162.6,188.7 177.0,188.7 191.5,182.4 205.9,182.4 220.3,190.0 234.8,190.0 249.2,175.3 263.6,175.3 278.1,179.8 292.5,179.8 306.9,170.3 321.4,170.3 335.8,165.3 350.2,165.3 364.7,171.3 379.1,171.3 393.5,154.5 408.0,154.5 422.4,162.7 436.8,162.7 451.3,152.6 465.7,152.6 480.1,146.8 494.6,146.8 509.0,151.7 523.4,151.7 537.9,138.7 552.3,138.7 566.7,131.4 581.2,131.4 595.6,135.0 610.0,135.0 624.5,115.8 638.9,115.8 653.3,122.6 667.8,122.6 682.2,113.5 696.6,113.5 711.1,117.6 725.5,117.6 739.9,106.4 754.4,106.4 768.8,99.5 783.2,99.5 797.7,105.4 812.1,105.4 826.5,91.2 841.0,91.2 855.4,86.6 869.8,86.6 884.3,95.3 898.7,95.3 913.1,83.8 927.6,83.8 942.0,75.3 942.0,204.0" fill="url(#balGrad)"/><polyline fill="none" stroke="#0284c7" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="76.0,204.0 90.4,204.0 104.9,195.8 119.3,195.8 133.7,201.2 148.2,201.2 162.6,188.7 177.0,188.7 191.5,182.4 205.9,182.4 220.3,190.0 234.8,190.0 249.2,175.3 263.6,175.3 278.1,179.8 292.5,179.8 306.9,170.3 321.4,170.3 335.8,165.3 350.2,165.3 364.7,171.3 379.1,171.3 393.5,154.5 408.0,154.5 422.4,162.7 436.8,162.7 451.3,152.6 465.7,152.6 480.1,146.8 494.6,146.8 509.0,151.7 523.4,151.7 537.9,138.7 552.3,138.7 566.7,131.4 581.2,131.4 595.6,135.0 610.0,135.0 624.5,115.8 638.9,115.8 653.3,122.6 667.8,122.6 682.2,113.5 696.6,113.5 711.1,117.6 725.5,117.6 739.9,106.4 754.4,106.4 768.8,99.5 783.2,99.5 797.7,105.4 812.1,105.4 826.5,91.2 841.0,91.2 855.4,86.6 869.8,86.6 884.3,95.3 898.7,95.3 913.1,83.8 927.6,83.8 942.0,75.3"/><circle cx="942.0" cy="75.3" r="4" fill="#0284c7" /><polyline fill="none" stroke="#10b981" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="76.0,204.0 89.5,204.0 103.1,194.2 116.6,194.2 130.1,198.5 143.7,198.5 157.2,184.5 170.7,184.5 184.2,176.6 197.8,176.6 211.3,182.1 224.8,182.1 238.4,165.9 251.9,165.9 265.4,169.4 279.0,169.4 292.5,158.5 306.0,158.5 319.6,152.0 333.1,152.0 346.6,156.8 360.2,156.8 373.7,138.8 387.2,138.8 400.8,145.2 414.3,145.2 427.8,133.3 441.3,133.3 454.9,126.4 468.4,126.4 481.9,130.6 495.5,130.6 509.0,115.8 522.5,115.8 536.1,107.0 549.6,107.0 563.1,110.1 576.7,110.1 590.2,89.3 603.7,89.3 617.2,94.6 630.8,94.6 644.3,84.3 657.8,84.3 671.4,87.8 684.9,87.8 698.4,75.3 712.0,75.3 725.5,66.9 739.0,66.9 752.6,71.8 766.1,71.8 779.6,56.0 793.2,56.0 806.7,50.3 820.2,50.3 833.8,57.1 847.3,57.1 860.8,44.0 874.3,44.0 887.9,34.1 901.4,34.1 914.9,26.7 928.5,26.7 942.0,16.0"/><circle cx="942.0" cy="16.0" r="4" fill="#10b981" /><text x="76" y="224" fill="var(--muted)" font-size="11">Start</text><text x="942" y="224" text-anchor="end" fill="var(--muted)" font-size="11">End of Test</text></svg></div>
+  </div>
+
+  <div class='panel'><div class='panel-head'><h2>Metrics Delta</h2></div><div class='scroll-box'><table><thead><tr><th>Metric</th><th class='num'>Base</th><th class='num'>Target</th><th class='num'>Delta</th></tr></thead><tbody><tr><td><b>Total Net Profit</b></td><td class='num'>194.30</td><td class='num'>283.80</td><td class='num'><span class="pill good">+89.5 (+46.06%)</span></td></tr>
+<tr><td><b>Profit Factor</b></td><td class='num'>2.96</td><td class='num'>4.59</td><td class='num'><span class="pill good">+1.63 (+55.07%)</span></td></tr>
+<tr><td><b>Total Trades</b></td><td class='num'>30</td><td class='num'>32</td><td class='num'><span class="pill good">+2 (+6.67%)</span></td></tr>
+<tr><td><b>Total Deals</b></td><td class='num'>60</td><td class='num'>64</td><td class='num'><span class="pill good">+4 (+6.67%)</span></td></tr>
+<tr><td><b>Balance Drawdown Maximal</b></td><td class='num'>42.50 (0.42%)</td><td class='num'>42.50 (0.42%)</td><td class='num'><span class="pill ">+0 (+0.00%)</span></td></tr>
+<tr><td><b>Equity Drawdown Maximal</b></td><td class='num'>54.20 (0.54%)</td><td class='num'>54.20 (0.54%)</td><td class='num'><span class="pill ">+0 (+0.00%)</span></td></tr>
+<tr><td><b>Sharpe Ratio</b></td><td class='num'>10.79</td><td class='num'>15.77</td><td class='num'><span class="pill good">+4.98 (+46.15%)</span></td></tr>
+<tr><td><b>Recovery Factor</b></td><td class='num'>4.57</td><td class='num'>6.68</td><td class='num'><span class="pill good">+2.11 (+46.17%)</span></td></tr>
+<tr><td><b>Expected Payoff</b></td><td class='num'>6.48</td><td class='num'>8.87</td><td class='num'><span class="pill good">+2.39 (+36.88%)</span></td></tr>
+<tr><td><b>Profit Trades (% of total)</b></td><td class='num'>19 (63.33%)</td><td class='num'>21 (65.62%)</td><td class='num'><span class="pill good">+2 (+10.53%)</span></td></tr></tbody></table></div></div>
+  <div class='panel'><div class='panel-head'><h2>Input Differences (2)</h2></div><div class='scroll-box'><table><thead><tr><th>Input</th><th>Base</th><th>Target</th></tr></thead><tbody><tr><td><code>InpFastMAPeriod</code></td><td><code>12</code></td><td><code>14</code></td></tr>
+<tr><td><code>InpStopLossPts</code></td><td><code>900</code></td><td><code>850</code></td></tr></tbody></table></div></div>
+  <div class='panel'><div class='panel-head'><h2>Sample Differing Deals (highlighted cells show exact divergence)</h2></div><div class='scroll-box'><table><thead><tr><th>Row</th><th>Run</th><th>deal</th><th>symbol</th><th>type</th><th>direction</th><th>volume</th><th>price</th><th>order</th><th>commission</th><th>swap</th><th>profit</th><th>balance</th><th>comment</th></tr></thead><tbody><tr><td rowspan="2" class="num"><b>#3</b></td><td><span class="pill">Base</span></td><td class=""><code>3</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2662.40</code></td><td class=""><code>3</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>12.40</code></td><td class="diff-cell"><code>10 012.40</code></td><td class=""><code>tp 2668.00</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>3</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2664.80</code></td><td class=""><code>3</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>14.80</code></td><td class="diff-cell"><code>10 014.80</code></td><td class=""><code>tp 2668.00</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#4</b></td><td><span class="pill">Base</span></td><td class=""><code>4</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2653.50</code></td><td class=""><code>4</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 012.40</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>4</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2653.50</code></td><td class=""><code>4</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 014.80</code></td><td class=""><code>MA Cross Entry</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#5</b></td><td><span class="pill">Base</span></td><td class=""><code>5</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2661.70</code></td><td class=""><code>5</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>-8.20</code></td><td class="diff-cell"><code>10 004.20</code></td><td class=""><code>sl 2667.00</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>5</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2660.00</code></td><td class=""><code>5</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>-6.50</code></td><td class="diff-cell"><code>10 008.30</code></td><td class=""><code>sl 2667.00</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#6</b></td><td><span class="pill">Base</span></td><td class=""><code>6</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2657.00</code></td><td class=""><code>6</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 004.20</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>6</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2657.00</code></td><td class=""><code>6</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 008.30</code></td><td class=""><code>MA Cross Entry</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#7</b></td><td><span class="pill">Base</span></td><td class=""><code>7</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2675.90</code></td><td class=""><code>7</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>18.90</code></td><td class="diff-cell"><code>10 023.10</code></td><td class=""><code>tp 2679.00</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>7</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2678.20</code></td><td class=""><code>7</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>21.20</code></td><td class="diff-cell"><code>10 029.50</code></td><td class=""><code>tp 2679.00</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#8</b></td><td><span class="pill">Base</span></td><td class=""><code>8</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2660.50</code></td><td class=""><code>8</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 023.10</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>8</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2660.50</code></td><td class=""><code>8</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 029.50</code></td><td class=""><code>MA Cross Entry</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#9</b></td><td><span class="pill">Base</span></td><td class=""><code>9</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2670.00</code></td><td class=""><code>9</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>9.50</code></td><td class="diff-cell"><code>10 032.60</code></td><td class=""><code>tp 2684.50</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>9</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2672.40</code></td><td class=""><code>9</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>11.90</code></td><td class="diff-cell"><code>10 041.40</code></td><td class=""><code>tp 2684.50</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#10</b></td><td><span class="pill">Base</span></td><td class=""><code>10</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2664.00</code></td><td class=""><code>10</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 032.60</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>10</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2664.00</code></td><td class=""><code>10</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 041.40</code></td><td class=""><code>MA Cross Entry</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#11</b></td><td><span class="pill">Base</span></td><td class=""><code>11</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2675.40</code></td><td class=""><code>11</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>-11.40</code></td><td class="diff-cell"><code>10 021.20</code></td><td class=""><code>sl 2682.00</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>11</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2672.40</code></td><td class=""><code>11</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>-8.40</code></td><td class="diff-cell"><code>10 033.00</code></td><td class=""><code>sl 2682.00</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#12</b></td><td><span class="pill">Base</span></td><td class=""><code>12</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2667.50</code></td><td class=""><code>12</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 021.20</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>12</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2667.50</code></td><td class=""><code>12</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 033.00</code></td><td class=""><code>MA Cross Entry</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#13</b></td><td><span class="pill">Base</span></td><td class=""><code>13</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2689.60</code></td><td class=""><code>13</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>22.10</code></td><td class="diff-cell"><code>10 043.30</code></td><td class=""><code>tp 2687.50</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>13</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>sell</code></td><td class=""><code>out</code></td><td class=""><code>0.01</code></td><td class="diff-cell"><code>2692.00</code></td><td class=""><code>13</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>24.50</code></td><td class="diff-cell"><code>10 057.50</code></td><td class=""><code>tp 2687.50</code></td></tr>
+<tr><td rowspan="2" class="num"><b>#14</b></td><td><span class="pill">Base</span></td><td class=""><code>14</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2671.00</code></td><td class=""><code>14</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 043.30</code></td><td class=""><code>MA Cross Entry</code></td></tr><tr><td><span class="pill accent">Target</span></td><td class=""><code>14</code></td><td class=""><code>XAUUSD</code></td><td class=""><code>buy</code></td><td class=""><code>in</code></td><td class=""><code>0.01</code></td><td class=""><code>2671.00</code></td><td class=""><code>14</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class=""><code>0.00</code></td><td class="diff-cell"><code>10 057.50</code></td><td class=""><code>MA Cross Entry</code></td></tr></tbody></table></div></div>
+</div>
+<script>
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  if (next === 'dark') root.setAttribute('data-theme', 'dark');
+  else root.removeAttribute('data-theme');
+  try { localStorage.setItem('mt5_report_theme', next); } catch (e) {}
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const btn = document.getElementById('themeBtn');
+  if (!btn) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  btn.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+updateThemeBtn();
+</script></body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MT5 Parallel Optimization — sample_opt1</title>
+<script>
+(function() {
+  try {
+    var t = localStorage.getItem('mt5_report_theme');
+    if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --card-alt: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --muted: #64748b; --accent: #0284c7; --accent-soft: rgba(2,132,199,0.10);
+    --good: #059669; --good-bg: rgba(16,185,129,0.12);
+    --bad: #dc2626; --bad-bg: rgba(239,68,68,0.12);
+    --warn: #d97706; --warn-bg: rgba(245,158,11,0.13);
+    --code-bg: #f1f5f9; --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  }
+  html[data-theme="dark"] {
+    --bg: #0b1120; --card: #111827; --card-alt: #1e293b; --border: #1f2937;
+    --text: #f8fafc; --muted: #94a3b8; --accent: #38bdf8; --accent-soft: rgba(56,189,248,0.14);
+    --good: #34d399; --good-bg: rgba(52,211,153,0.15);
+    --bad: #f87171; --bad-bg: rgba(248,113,113,0.15);
+    --warn: #fbbf24; --warn-bg: rgba(251,191,36,0.15);
+    --code-bg: #1e293b; --shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 24px 20px 48px; }
+  .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .title { font-size: 1.42rem; font-weight: 750; margin: 0; letter-spacing: -0.015em; }
+  .subtitle { color: var(--muted); font-size: 0.88rem; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .badge { display: inline-flex; align-items: center; padding: 5px 13px; border-radius: 999px; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em; color: #fff; }
+  .pill { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: var(--card-alt); border: 1px solid var(--border); color: var(--text); }
+  .pill.good { background: var(--good-bg); color: var(--good); border-color: transparent; }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .btn { cursor: pointer; border: 1px solid var(--border); background: var(--card-alt); color: var(--text); border-radius: 9px; padding: 6px 12px; font-size: 0.82rem; font-weight: 600; transition: all 0.15s ease; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { opacity: 0.92; color: #fff; }
+  .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi-label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  .kpi-val { font-size: 1.24rem; font-weight: 750; margin-top: 5px; font-variant-numeric: tabular-nums; }
+  .kpi-sub { font-size: 0.78rem; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .kpi-val.good, .good { color: var(--good); }
+  .kpi-val.bad, .bad { color: var(--bad); }
+  .kpi-val.warn, .warn { color: var(--warn); }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel h2 { margin: 0; font-size: 1.06rem; font-weight: 700; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+  .charts-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .chart-card { background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .chart-card img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
+  .chart-title { font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--card-alt); position: sticky; top: 0; font-weight: 650; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; z-index: 1; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll-box { max-height: 460px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .search-input { width: 100%; max-width: 340px; padding: 7px 12px; border: 1px solid var(--border); background: var(--card-alt); color: var(--text); border-radius: 8px; font-size: 0.86rem; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.84rem; }
+  .log-box { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; overflow-x: auto; font-size: 0.8rem; border: 1px solid var(--border); margin: 10px 0 0; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: 0.83em; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .winbar-wrap { margin-top: 8px; height: 8px; border-radius: 999px; background: var(--bad-bg); overflow: hidden; display: flex; }
+  .winbar-fill { background: var(--good); height: 100%; }
+  .group-row td { background: var(--card-alt); font-weight: 700; color: var(--accent); font-size: 0.78rem; letter-spacing: 0.03em; }
+  .svg-wrap { width: 100%; overflow: hidden; }
+  .svg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; font-size: 0.84rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .diff-cell { background: var(--warn-bg); font-weight: 700; }
+  @media (max-width: 640px) { .grid2, .charts-grid, .charts-grid-3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1 class="title">Parallel Optimization: sample_opt1</h1>
+      <div class="subtitle">
+        <span>Source: <code>C:\\MT5Data\\sample_opt1.xml</code></span>
+        <span class="pill accent">Ranked by: profit</span>
+        <span class="pill">Filtered: 10 / 10 passes</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="badge" style="background:#0284c7">OPTIMIZATION XML</span>
+      <button id="themeBtn" class="btn" onclick="toggleTheme()">Dark Mode</button>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">Total Passes</div><div class="kpi-val">10</div><div class="kpi-sub">Multi-core agent sweep</div></div>
+    <div class="kpi"><div class="kpi-label">Profitable Passes</div><div class="kpi-val good">7</div><div class="kpi-sub">70.0% profitable</div></div>
+    <div class="kpi"><div class="kpi-label">Winning Pass</div><div class="kpi-val">#72</div><div class="kpi-sub">XAUUSD</div></div>
+    <div class="kpi"><div class="kpi-label">Best Net Profit</div><div class="kpi-val good">4,215.40</div><div class="kpi-sub">Trades: 312</div></div>
+    <div class="kpi"><div class="kpi-label">Best Profit Factor</div><div class="kpi-val">1.84</div><div class="kpi-sub">Sharpe: 3.41</div></div>
+    <div class="kpi"><div class="kpi-label">Best Drawdown %</div><div class="kpi-val warn">8.42%</div><div class="kpi-sub">Recovery: 5.12</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Top Pass Spotlight (#72)</h2>
+        <button id="copySetBtn" class="btn primary" onclick="copyBestSet()">Copy .set Inputs</button>
+      </div>
+      <textarea id="bestSetPayload" style="position:absolute;left:-9999px">InpMagicNumber=100201
+InpFastMAPeriod=14
+InpSlowMAPeriod=50
+InpStopLossMult=1.2
+InpTakeProfitMult=2.4
+InpTrailingMult=0.8</textarea>
+      <div class="scroll-box" style="max-height:310px">
+        <table><thead><tr><th>Parameter</th><th class="num">Value</th></tr></thead><tbody><tr><td><code>InpMagicNumber</code></td><td class='num'><b>100201</b></td></tr>
+<tr><td><code>InpFastMAPeriod</code></td><td class='num'><b>14</b></td></tr>
+<tr><td><code>InpSlowMAPeriod</code></td><td class='num'><b>50</b></td></tr>
+<tr><td><code>InpStopLossMult</code></td><td class='num'><b>1.2</b></td></tr>
+<tr><td><code>InpTakeProfitMult</code></td><td class='num'><b>2.4</b></td></tr>
+<tr><td><code>InpTrailingMult</code></td><td class='num'><b>0.8</b></td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Top 10 Passes (profit)</h2>
+      </div>
+      <div class="svg-wrap"><svg viewBox="0 0 640 300" width="100%" height="auto"><text x="140" y="27" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #72 (XAUUSD)</text><rect x="150" y="15" width="395.0" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="553.0" y="27" fill="var(--muted)" font-size="11.5" font-weight="600">4,215.40</text><text x="140" y="55" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #33 (EURUSD)</text><rect x="150" y="43" width="275.5" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="433.5" y="55" fill="var(--muted)" font-size="11.5" font-weight="600">2,940.15</text><text x="140" y="83" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #70 (US500)</text><rect x="150" y="71" width="204.3" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="362.3" y="83" fill="var(--muted)" font-size="11.5" font-weight="600">2,180.60</text><text x="140" y="111" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #18 (GBPUSD)</text><rect x="150" y="99" width="154.2" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="312.2" y="111" fill="var(--muted)" font-size="11.5" font-weight="600">1,645.25</text><text x="140" y="139" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #57 (USDJPY)</text><rect x="150" y="127" width="105.0" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="263.0" y="139" fill="var(--muted)" font-size="11.5" font-weight="600">1,120.80</text><text x="140" y="167" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #34 (US100)</text><rect x="150" y="155" width="78.7" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="236.7" y="167" fill="var(--muted)" font-size="11.5" font-weight="600">840.30</text><text x="140" y="195" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #26 (AUDUSD)</text><rect x="150" y="183" width="39.0" height="17" rx="4" fill="#10b981" opacity="0.88"/><text x="197.0" y="195" fill="var(--muted)" font-size="11.5" font-weight="600">415.90</text><text x="140" y="223" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #19 (USDCAD)</text><rect x="150" y="211" width="23.0" height="17" rx="4" fill="#ef4444" opacity="0.88"/><text x="181.0" y="223" fill="var(--muted)" font-size="11.5" font-weight="600">-245.10</text><text x="140" y="251" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #1 (NZDUSD)</text><rect x="150" y="239" width="38.7" height="17" rx="4" fill="#ef4444" opacity="0.88"/><text x="196.7" y="251" fill="var(--muted)" font-size="11.5" font-weight="600">-412.75</text><text x="140" y="279" text-anchor="end" fill="var(--text)" font-size="11.5" font-weight="600">Pass #52 (EURJPY)</text><rect x="150" y="267" width="64.2" height="17" rx="4" fill="#ef4444" opacity="0.88"/><text x="222.2" y="279" fill="var(--muted)" font-size="11.5" font-weight="600">-685.40</text></svg></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Leaderboard (Top 10 Passes)</h2>
+      <span id="optCount" class="muted">10 visible</span>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" id="optFilter" placeholder="Filter by symbol, pass #, or parameter..." oninput="filterOpt()" />
+      <label class="btn" style="display:inline-flex;align-items:center;gap:6px">
+        <input type="checkbox" id="profOnly" onchange="filterOpt()" /> Profitable only
+      </label>
+    </div>
+    <div class="scroll-box" style="max-height:560px">
+      <table id="optTable">
+        <thead><tr><th class="sortable num" onclick="sortOpt(0)">Rank</th><th class="sortable num" onclick="sortOpt(1)">Pass</th><th class="sortable " onclick="sortOpt(2)">Symbol</th><th class="sortable num" onclick="sortOpt(3)">Result</th><th class="sortable num" onclick="sortOpt(4)">Profit</th><th class="sortable num" onclick="sortOpt(5)">Trades</th><th class="sortable num" onclick="sortOpt(6)">PF</th><th class="sortable num" onclick="sortOpt(7)">DD %</th><th class="sortable num" onclick="sortOpt(8)">Sharpe</th><th class="sortable num" onclick="sortOpt(9)">Recovery</th><th class="sortable num" onclick="sortOpt(10)">InpFastMAPeriod</th><th class="sortable num" onclick="sortOpt(11)">InpSlowMAPeriod</th><th class="sortable num" onclick="sortOpt(12)">InpStopLossMult</th><th class="sortable num" onclick="sortOpt(13)">InpTakeProfitMult</th><th class="sortable num" onclick="sortOpt(14)">InpTrailingMult</th></tr></thead>
+        <tbody><tr data-prof="1"><td data-val="1"><span class="pill good">#1</span></td><td class="num" data-val="72"><b>#72</b></td><td data-val="XAUUSD"><b>XAUUSD</b></td><td class="num" data-val="4215.4">4215.4</td><td class="num good" data-val="4215.4"><b>4,215.40</b></td><td class="num" data-val="312">312</td><td class="num" data-val="1.84">1.84</td><td class="num" data-val="8.42">8.42%</td><td class="num" data-val="3.41">3.41</td><td class="num" data-val="5.12">5.12</td><td class="num" data-val="14"><code>14</code></td><td class="num" data-val="50"><code>50</code></td><td class="num" data-val="1.2"><code>1.2</code></td><td class="num" data-val="2.4"><code>2.4</code></td><td class="num" data-val="0.8"><code>0.8</code></td></tr><tr data-prof="1"><td data-val="2"><span class="pill accent">#2</span></td><td class="num" data-val="33"><b>#33</b></td><td data-val="EURUSD"><b>EURUSD</b></td><td class="num" data-val="2940.15">2940.15</td><td class="num good" data-val="2940.15"><b>2,940.15</b></td><td class="num" data-val="286">286</td><td class="num" data-val="1.62">1.62</td><td class="num" data-val="6.95">6.95%</td><td class="num" data-val="2.85">2.85</td><td class="num" data-val="4.18">4.18</td><td class="num" data-val="12"><code>12</code></td><td class="num" data-val="45"><code>45</code></td><td class="num" data-val="1.0"><code>1.0</code></td><td class="num" data-val="2.0"><code>2.0</code></td><td class="num" data-val="0.7"><code>0.7</code></td></tr><tr data-prof="1"><td data-val="3"><span class="pill accent">#3</span></td><td class="num" data-val="70"><b>#70</b></td><td data-val="US500"><b>US500</b></td><td class="num" data-val="2180.6">2180.6</td><td class="num good" data-val="2180.6"><b>2,180.60</b></td><td class="num" data-val="241">241</td><td class="num" data-val="1.49">1.49</td><td class="num" data-val="9.1">9.1%</td><td class="num" data-val="2.32">2.32</td><td class="num" data-val="3.45">3.45</td><td class="num" data-val="16"><code>16</code></td><td class="num" data-val="55"><code>55</code></td><td class="num" data-val="1.4"><code>1.4</code></td><td class="num" data-val="2.2"><code>2.2</code></td><td class="num" data-val="0.9"><code>0.9</code></td></tr><tr data-prof="1"><td data-val="4"><span class="pill ">#4</span></td><td class="num" data-val="18"><b>#18</b></td><td data-val="GBPUSD"><b>GBPUSD</b></td><td class="num" data-val="1645.25">1645.25</td><td class="num good" data-val="1645.25"><b>1,645.25</b></td><td class="num" data-val="198">198</td><td class="num" data-val="1.38">1.38</td><td class="num" data-val="10.24">10.24%</td><td class="num" data-val="1.94">1.94</td><td class="num" data-val="2.74">2.74</td><td class="num" data-val="10"><code>10</code></td><td class="num" data-val="40"><code>40</code></td><td class="num" data-val="1.1"><code>1.1</code></td><td class="num" data-val="1.8"><code>1.8</code></td><td class="num" data-val="0.6"><code>0.6</code></td></tr><tr data-prof="1"><td data-val="5"><span class="pill ">#5</span></td><td class="num" data-val="57"><b>#57</b></td><td data-val="USDJPY"><b>USDJPY</b></td><td class="num" data-val="1120.8">1120.8</td><td class="num good" data-val="1120.8"><b>1,120.80</b></td><td class="num" data-val="214">214</td><td class="num" data-val="1.29">1.29</td><td class="num" data-val="11.15">11.15%</td><td class="num" data-val="1.61">1.61</td><td class="num" data-val="2.08">2.08</td><td class="num" data-val="18"><code>18</code></td><td class="num" data-val="60"><code>60</code></td><td class="num" data-val="1.5"><code>1.5</code></td><td class="num" data-val="2.5"><code>2.5</code></td><td class="num" data-val="1.0"><code>1.0</code></td></tr><tr data-prof="1"><td data-val="6"><span class="pill ">#6</span></td><td class="num" data-val="34"><b>#34</b></td><td data-val="US100"><b>US100</b></td><td class="num" data-val="840.3">840.3</td><td class="num good" data-val="840.3"><b>840.30</b></td><td class="num" data-val="176">176</td><td class="num" data-val="1.21">1.21</td><td class="num" data-val="12.6">12.6%</td><td class="num" data-val="1.28">1.28</td><td class="num" data-val="1.72">1.72</td><td class="num" data-val="20"><code>20</code></td><td class="num" data-val="65"><code>65</code></td><td class="num" data-val="1.6"><code>1.6</code></td><td class="num" data-val="2.6"><code>2.6</code></td><td class="num" data-val="1.1"><code>1.1</code></td></tr><tr data-prof="1"><td data-val="7"><span class="pill ">#7</span></td><td class="num" data-val="26"><b>#26</b></td><td data-val="AUDUSD"><b>AUDUSD</b></td><td class="num" data-val="415.9">415.9</td><td class="num good" data-val="415.9"><b>415.90</b></td><td class="num" data-val="152">152</td><td class="num" data-val="1.12">1.12</td><td class="num" data-val="13.4">13.4%</td><td class="num" data-val="0.85">0.85</td><td class="num" data-val="1.19">1.19</td><td class="num" data-val="8"><code>8</code></td><td class="num" data-val="35"><code>35</code></td><td class="num" data-val="0.9"><code>0.9</code></td><td class="num" data-val="1.6"><code>1.6</code></td><td class="num" data-val="0.5"><code>0.5</code></td></tr><tr data-prof="0"><td data-val="8"><span class="pill ">#8</span></td><td class="num" data-val="19"><b>#19</b></td><td data-val="USDCAD"><b>USDCAD</b></td><td class="num" data-val="-245.1">-245.1</td><td class="num bad" data-val="-245.1"><b>-245.10</b></td><td class="num" data-val="144">144</td><td class="num" data-val="0.91">0.91</td><td class="num" data-val="15.8">15.8%</td><td class="num" data-val="-0.42">-0.42</td><td class="num" data-val="-0.45">-0.45</td><td class="num" data-val="6"><code>6</code></td><td class="num" data-val="30"><code>30</code></td><td class="num" data-val="0.8"><code>0.8</code></td><td class="num" data-val="1.4"><code>1.4</code></td><td class="num" data-val="0.4"><code>0.4</code></td></tr><tr data-prof="0"><td data-val="9"><span class="pill ">#9</span></td><td class="num" data-val="1"><b>#1</b></td><td data-val="NZDUSD"><b>NZDUSD</b></td><td class="num" data-val="-412.75">-412.75</td><td class="num bad" data-val="-412.75"><b>-412.75</b></td><td class="num" data-val="131">131</td><td class="num" data-val="0.84">0.84</td><td class="num" data-val="17.2">17.2%</td><td class="num" data-val="-0.89">-0.89</td><td class="num" data-val="-0.71">-0.71</td><td class="num" data-val="22"><code>22</code></td><td class="num" data-val="75"><code>75</code></td><td class="num" data-val="1.8"><code>1.8</code></td><td class="num" data-val="2.8"><code>2.8</code></td><td class="num" data-val="1.2"><code>1.2</code></td></tr><tr data-prof="0"><td data-val="10"><span class="pill ">#10</span></td><td class="num" data-val="52"><b>#52</b></td><td data-val="EURJPY"><b>EURJPY</b></td><td class="num" data-val="-685.4">-685.4</td><td class="num bad" data-val="-685.4"><b>-685.40</b></td><td class="num" data-val="168">168</td><td class="num" data-val="0.78">0.78</td><td class="num" data-val="19.5">19.5%</td><td class="num" data-val="-1.35">-1.35</td><td class="num" data-val="-1.04">-1.04</td><td class="num" data-val="24"><code>24</code></td><td class="num" data-val="80"><code>80</code></td><td class="num" data-val="2.0"><code>2.0</code></td><td class="num" data-val="3.0"><code>3.0</code></td><td class="num" data-val="1.5"><code>1.5</code></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+let sortCol = -1, sortAsc = false;
+function filterOpt() {
+  const q = document.getElementById('optFilter').value.toLowerCase();
+  const profOnly = document.getElementById('profOnly').checked;
+  let visible = 0;
+  for (const r of document.querySelectorAll('#optTable tbody tr')) {
+    const okQ = r.textContent.toLowerCase().includes(q);
+    const okP = !profOnly || r.getAttribute('data-prof') === '1';
+    const show = okQ && okP;
+    r.style.display = show ? '' : 'none';
+    if (show) visible++;
+  }
+  document.getElementById('optCount').textContent = visible + ' visible';
+}
+function sortOpt(col) {
+  const tbody = document.querySelector('#optTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  sortAsc = (sortCol === col) ? !sortAsc : (col === 0 || col === 7);
+  sortCol = col;
+  rows.sort((a, b) => {
+    const va = (a.children[col].getAttribute('data-val') || a.children[col].textContent).trim();
+    const vb = (b.children[col].getAttribute('data-val') || b.children[col].textContent).trim();
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) return sortAsc ? na - nb : nb - na;
+    return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+function copyBestSet() {
+  const text = document.getElementById('bestSetPayload').value;
+  const btn = document.getElementById('copySetBtn');
+  if (navigator.clipboard) navigator.clipboard.writeText(text);
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = 'Copy .set Inputs'; }, 1800);
+}
+</script>
+<script>
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  if (next === 'dark') root.setAttribute('data-theme', 'dark');
+  else root.removeAttribute('data-theme');
+  try { localStorage.setItem('mt5_report_theme', next); } catch (e) {}
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const btn = document.getElementById('themeBtn');
+  if (!btn) return;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  btn.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+updateThemeBtn();
+</script></body>
+</html>

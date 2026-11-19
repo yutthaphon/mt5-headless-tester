@@ -1,0 +1,17 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Auto-bootstrapped embeddable Python runtime
+.python/
+
+# Local credentials & project terminal bindings
+.env
+.env.*
+!.env.example
+.mt5-headless.json
+
+# Isolated portable MT5 instances
+.mt5-portable/
+.mt5-portable*/
