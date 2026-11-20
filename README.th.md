@@ -177,6 +177,73 @@ flowchart TD
 
 ---
 
+## ตัวอย่าง Prompt สำหรับสั่งงาน AI (AI Prompt Examples)
+
+### วิธีเรียกใช้งานกับ AI แต่ละค่าย
+
+หลังจากติดตั้งผ่าน [ตัวติดตั้ง Multi-AI](#2-การติดตั้งผ่าน-ai-เจ้าต่างๆ-รองรับโยนลิงก์-git--คำสั่งพิเศษ-mt5-headless) แล้ว คุณสามารถสั่งงาน AI Assistant ได้ทันทีผ่านช่องทางต่อไปนี้:
+- **คำสั่งพิเศษ (Slash command)**: `/mt5-headless <คำสั่งของคุณ>` (Antigravity, Claude Code, Cursor, Windsurf, Roo Code, GitHub Copilot), `/mt5-headless.md <คำสั่งของคุณ>` (Cline), หรือ `/prompts:mt5-headless <คำสั่งของคุณ>` (OpenAI Codex CLI)
+- **Mention**: `@mt5-headless-tester <คำสั่งของคุณ>` (Cursor)
+- **ภาษาธรรมชาติ (Natural language)**: พิมพ์สั่งเป็นภาษาไทยหรืออังกฤษได้โดยตรง — ตัว Skill จะถูกเรียกใช้อัตโนมัติเมื่อพูดถึงการทำ Backtest MT5, ไฟล์ `.set`, `.mq5`/`.ex5` หรือ Strategy Tester
+
+> **เคล็ดลับ:** สามารถเปลี่ยน `/mt5-headless` ในตัวอย่างด้านล่างเป็น `/prompts:mt5-headless`, `/mt5-headless.md`, `@mt5-headless-tester` หรือสั่งเป็นประโยคภาษาไทย/อังกฤษล้วนๆ ตาม AI ที่ใช้งานอยู่ได้ทันที
+
+### ตัวอย่าง Prompt พร้อมคัดลอกไปใช้งานตามสถานการณ์
+
+#### 1. ค้นหา MT5 ในเครื่อง ผูกโปรเจกต์ หรือสร้าง Portable แยกอิสระ
+
+- **ผูก MT5 ตัวที่มีอยู่ + โหมด `hidden-desktop` ไม่กวนหน้าจอ:**
+  ```text
+  /mt5-headless ช่วยสแกนหา MT5 ทั้งหมดในเครื่อง แล้วผูกตัวที่ 1 เข้ากับโปรเจกต์นี้โดยใช้โหมด hidden-desktop เพื่อไม่ให้เด้งรบกวนหน้าจอ จากนั้นรัน init เช็คความพร้อมให้หน่อย
+  ```
+- **สร้างสภาพแวดล้อม `/portable` แยกเฉพาะในโปรเจกต์:**
+  ```text
+  /mt5-headless ช่วยสร้าง MT5 แบบ portable แยกไว้ในโปรเจกต์นี้จาก MT5 ตัวที่ 1 โดยตั้งโหมดเป็น hidden-desktop และสร้างไฟล์ .env template สำหรับใส่รหัสโบรกเกอร์ให้ด้วย
+  ```
+
+#### 2. ส่อง Input / Enum จากโค้ด `.mq5` และสร้างหรือเทียบไฟล์ `.set`
+
+- **ส่องค่า Enum และสร้างไฟล์ `.set` ด้วยชื่อ Enum ตรงๆ:**
+  ```text
+  /mt5-headless ช่วยส่องโค้ด src/MyEA.mq5 ดูค่า enum และ input ที่เกี่ยวกับโหมดเทรดและความเสี่ยง แล้วสร้างไฟล์ .set ชื่อ MyEA_Trend_v1 ลงโฟลเดอร์ Tester โดยอ้างอิงจากโปรไฟล์ MyEA.XAUUSD.M15.ini ปรับ InpTradeMode=MODE_TREND_FOLLOW และ InpLots=0.02
+  ```
+- **เปรียบเทียบความต่างระหว่างไฟล์ `.set` 2 ไฟล์:**
+  ```text
+  /mt5-headless ช่วยเทียบความต่างระหว่างไฟล์ MyEA_v1.set กับ MyEA_Trend_v1.set โดยอ้างอิงชื่อ enum จาก src/MyEA.mq5 แล้วสรุปตารางค่าที่เปลี่ยนไปให้ดูหน่อย
+  ```
+
+#### 3. สกัด Input จากไฟล์ `.ex5` ปิดซอร์ส หรือ EA จาก MQL5 Market (ไม่มีไฟล์ `.mq5`)
+
+```text
+/mt5-headless เรามีแค่ไฟล์ MQL5/Experts/Market/MyPurchasedEA.ex5 ไม่มีซอร์สโค้ด ช่วยรัน probe แบบไม่กวนหน้าจอบน XAUUSD H1 เพื่อดึงค่า input และ group ทั้งหมดออกมาแสดงเป็นตาราง แล้วสร้างไฟล์ .set ใหม่ชื่อ MyPurchasedEA_LowRisk โดยปรับ InpLots=0.01 ให้หน่อย
+```
+
+#### 4. คอมไพล์ `.mq5` และรัน Backtest แบบไม่แย่ง Focus + สร้างรายงาน HTML Dashboard
+
+```text
+/mt5-headless ช่วยคอมไพล์ไฟล์ src/MyEA.mq5 เช็คให้ชัวร์ว่า 0 errors แล้วรัน Backtest คู่ XAUUSD M15 ตั้งแต่วันที่ 2026.01.01 ถึง 2026.06.01 ด้วย Model 1 (1-minute OHLC) ใช้ชุดค่า MyEA_Trend_v1.set ในโหมด hidden-desktop พอเสร็จแล้วส่งออกรายงาน HTML พร้อมกราฟไว้ที่ reports/trend_v1.html และสรุปผลกำไรกับ Drawdown ให้ด้วย
+```
+
+#### 5. รัน Parallel Optimization หลายคอร์เพื่อหาค่าพารามิเตอร์ที่ดีที่สุด + สกัดไฟล์ `.set`
+
+```text
+/mt5-headless ช่วยรัน Parallel Optimization ของ src/MyEA.mq5 บน XAUUSD M15 (2026.01.01 ถึง 2026.06.01, Model 1) โดยกวาดค่า InpFastMAPeriod ตั้งแต่ 10 ถึง 40 ทีละ 5 และ InpStopLossPts ตั้งแต่ 400 ถึง 1200 ทีละ 200 คัดเฉพาะรอบที่เทรดอย่างน้อย 50 ไม้ และ Max DD ไม่เกิน 20% เรียงตามค่า Sharpe Ratio แล้วบันทึกชุดค่าอันดับ 1 เป็นไฟล์ MyEA_OptBest.set พร้อมสร้างตาราง HTML Leaderboard ไว้ที่ reports/opt_results.html
+```
+
+#### 6. เปรียบเทียบผลรัน 2 รอบแบบ Deal-by-Deal (A/B Test หรือเช็ค Regression หลังแก้โค้ด)
+
+```text
+/mt5-headless ช่วยเปรียบเทียบผล Backtest ระหว่างรอบ run_baseline กับ run_new_filter แบบ Deal-by-Deal แล้วสร้างรายงานเปรียบเทียบ HTML ไว้ที่ reports/ab_compare.html พร้อมสรุปให้หน่อยว่าออเดอร์ตรงกันทั้งหมดไหม หรือเริ่มต่างกันที่ดีลไหน และค่า Net Profit, Profit Factor, Drawdown เปลี่ยนไปอย่างไร
+```
+
+#### 7. สั่ง AI วิเคราะห์จุดอ่อนจากรายงานและวนลูปจูนพารามิเตอร์ให้อัตโนมัติ
+
+```text
+/mt5-headless ช่วยรัน Backtest ตั้งต้นของ src/MyEA.mq5 คู่ XAUUSD M15 ช่วง Q1 2026 ในโหมด hidden-desktop จากนั้นวิเคราะห์กราฟกำไร/ขาดทุนรายชั่วโมงและระยะเวลาถือออเดอร์จากรายงาน แล้วลองสร้างไฟล์ .set ใหม่ที่ปรับเวลาเทรดและ SL/TP เพื่อตัดช่วงเวลาที่ขาดทุนหนักออก รัน Backtest รอบที่สอง แล้วทำรายงาน Compare เทียบกับรอบแรกให้ดูหน่อย
+```
+
+---
+
 ## ตัวอย่างการเรียกใช้แต่ละรูปแบบ
 
 *(ตัวอย่างด้านล่างสามารถเปลี่ยน `scripts\mt5-headless.cmd` เป็น `scripts/mt5-headless.sh` สำหรับ Bash, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\Invoke-MT5Headless.ps1` สำหรับ PowerShell, หรือ `python scripts\mt5_headless.py` สำหรับ Python ได้ทันที)*

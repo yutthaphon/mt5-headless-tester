@@ -178,6 +178,73 @@ flowchart TD
 
 ---
 
+## AI Prompt Examples (How to Command Your AI Assistant)
+
+### Quick Invocation Reference
+
+After running the [Multi-AI Installer](#2-multi-ai-installation-git-link-auto-install--mt5-headless), you can trigger this skill inside your AI assistant using any of the following methods:
+- **Slash command**: `/mt5-headless <your request>` (Antigravity, Claude Code, Cursor, Windsurf, Roo Code, GitHub Copilot), `/mt5-headless.md <your request>` (Cline), or `/prompts:mt5-headless <your request>` (OpenAI Codex CLI).
+- **Mention**: `@mt5-headless-tester <your request>` (Cursor).
+- **Natural language**: Simply ask directly — the skill triggers automatically when you mention MT5 backtesting, `.set` presets, `.mq5`/`.ex5` EAs, or Strategy Tester.
+
+> **Tip:** Replace `/mt5-headless` below with `/prompts:mt5-headless`, `/mt5-headless.md`, `@mt5-headless-tester`, or plain English depending on your AI tool.
+
+### Copy-Paste Prompt Examples by Scenario
+
+#### 1. Discover MT5 & Bind / Setup Isolated Portable Mode
+
+- **Bind an existing MT5 installation with `hidden-desktop` mode:**
+  ```text
+  /mt5-headless Scan all MT5 installations on this machine and bind installation #1 to this project using hidden-desktop mode so it never steals window focus, then run init to check readiness.
+  ```
+- **Create an isolated project-local `/portable` environment:**
+  ```text
+  /mt5-headless Create an isolated portable MT5 environment in this project from installation #1 with hidden-desktop mode and generate the .env template for my broker credentials.
+  ```
+
+#### 2. Inspect `.mq5` Inputs/Enums & Build or Diff `.set` Presets
+
+- **Inspect enums & build a `.set` using symbolic enum names:**
+  ```text
+  /mt5-headless Inspect src/MyEA.mq5 to list all enum options and inputs related to TradeMode and risk. Then create a new .set file in the Tester folder named MyEA_Trend_v1 based on profile MyEA.XAUUSD.M15.ini with InpTradeMode=MODE_TREND_FOLLOW and InpLots=0.02.
+  ```
+- **Diff two `.set` presets side-by-side:**
+  ```text
+  /mt5-headless Compare MyEA_v1.set and MyEA_Trend_v1.set using src/MyEA.mq5 to resolve enum names, and show me a Markdown table of all changed inputs.
+  ```
+
+#### 3. Closed-Source `.ex5` or MQL5 Market EA (No Source Code)
+
+```text
+/mt5-headless I only have the compiled file MQL5/Experts/Market/MyPurchasedEA.ex5 without source code. Run a fast headless probe on XAUUSD H1 to extract all its inputs and groups, show me the full parameter table, and create a tuned .set file named MyPurchasedEA_LowRisk with InpLots=0.01.
+```
+
+#### 4. Compile `.mq5` & Run a Focus-Safe Headless Backtest + HTML Dashboard
+
+```text
+/mt5-headless Compile src/MyEA.mq5 and verify 0 errors. Then run a headless backtest on XAUUSD M15 from 2026.01.01 to 2026.06.01 using Model 1 (1-minute OHLC), preset MyEA_Trend_v1.set, and hidden-desktop mode. Export an interactive HTML report with embedded charts to reports/trend_v1.html and summarize the key metrics.
+```
+
+#### 5. Parallel Multi-Core Optimization & Best `.set` Extraction
+
+```text
+/mt5-headless Run a parallel optimization for src/MyEA.mq5 on XAUUSD M15 (2026.01.01 to 2026.06.01, Model 1) sweeping InpFastMAPeriod from 10 to 40 step 5 and InpStopLossPts from 400 to 1200 step 200. Filter for passes with at least 50 trades and max drawdown <= 20%, rank by Sharpe ratio, save the #1 winning pass to Tester as MyEA_OptBest.set, and export the HTML leaderboard to reports/opt_results.html.
+```
+
+#### 6. Deal-by-Deal A/B Comparison & Regression Verification
+
+```text
+/mt5-headless Compare backtest report run_baseline against run_new_filter deal-by-deal. Export the HTML comparison report to reports/ab_compare.html and tell me if the trades are identical or which deal diverged first and how Net Profit, Profit Factor, and Drawdown changed.
+```
+
+#### 7. End-to-End Autonomous Analysis & Parameter Tuning Loop
+
+```text
+/mt5-headless Run a baseline backtest of src/MyEA.mq5 on XAUUSD M15 for Q1 2026 in hidden-desktop mode. Analyze the report's profit/loss by hour and holding time, adjust the session filter and SL/TP inputs in a new .set file to cut the worst losing hours, run a second backtest, and generate an A/B comparison report showing the improvement.
+```
+
+---
+
 ## Usage Examples
 
 *(In all examples below, you can freely interchange `scripts\mt5-headless.cmd` (CMD), `scripts/mt5-headless.sh` (Bash), `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\Invoke-MT5Headless.ps1` (PowerShell), or `python scripts\mt5_headless.py` (Python).)*
